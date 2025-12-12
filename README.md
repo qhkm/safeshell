@@ -42,6 +42,7 @@ safeshell status          # Show stats
 safeshell clean           # Remove old checkpoints
 safeshell disable         # Revert to normal binaries
 safeshell enable          # Re-enable SafeShell protection
+safeshell upgrade         # Upgrade to latest version
 ```
 
 ## Why This Approach?
