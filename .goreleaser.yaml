@@ -1,0 +1,57 @@
+version: 2
+
+project_name: safeshell
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/safeshell
+    binary: safeshell
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/safeshell/safeshell/internal/cli.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    wrap_in_directory: true
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+brews:
+  - name: safeshell
+    repository:
+      owner: safeshell
+      name: homebrew-tap
+    homepage: https://github.com/safeshell/safeshell
+    description: Safe shell operations with automatic checkpoints for AI agents
+    license: MIT
+    install: |
+      bin.install "safeshell"
+    test: |
+      system "#{bin}/safeshell", "version"
