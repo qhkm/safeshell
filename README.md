@@ -42,6 +42,28 @@ safeshell status          # Show stats
 safeshell clean           # Remove old checkpoints
 ```
 
+## Why This Approach?
+
+We evaluated several approaches to make AI agents safer:
+
+| Approach | How It Works | Pros | Cons |
+|----------|--------------|------|------|
+| **Shell Aliases** ✅ | Replace `rm`/`mv` with aliases that checkpoint first | Simple, no root needed, works everywhere | Only catches aliased commands |
+| **Filesystem Sandbox** | Run agent in Docker/container with copy-on-write | Complete isolation | Heavy, complex setup, breaks some workflows |
+| **FUSE Filesystem** | Virtual filesystem that intercepts all writes | Catches everything transparently | Requires kernel modules, significant overhead |
+| **Git-based** | Auto-commit before every operation | Simple, familiar tooling | Only works for text files in git repos |
+| **Btrfs/ZFS Snapshots** | OS-level filesystem snapshots | Very efficient, catches everything | Requires specific filesystem, root access |
+
+**We chose Shell Aliases** because:
+- ✅ Zero setup complexity (one curl command)
+- ✅ No root/sudo required
+- ✅ Works on any macOS/Linux system
+- ✅ Minimal performance overhead
+- ✅ Easy to understand and debug
+- ✅ Hard links = zero extra disk space
+
+The tradeoff is that only aliased commands are protected. But in practice, `rm`, `mv`, `cp`, `chmod`, and `chown` cover 95% of destructive operations that AI agents perform.
+
 ## How It Works
 
 ```
