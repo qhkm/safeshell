@@ -9,6 +9,7 @@ Welcome to SafeShell! This guide will help you understand how SafeShell protects
 - [Your First Checkpoint](#your-first-checkpoint)
 - [Basic Commands](#basic-commands)
 - [Understanding Checkpoints](#understanding-checkpoints)
+- [How It Works Under the Hood](#how-it-works-under-the-hood)
 - [Common Scenarios](#common-scenarios)
 - [Tips and Best Practices](#tips-and-best-practices)
 - [Troubleshooting](#troubleshooting)
@@ -241,6 +242,151 @@ Command executed → Checkpoint created → Files backed up
                                               ↓
                                          Files restored!
 ```
+
+---
+
+## How It Works Under the Hood
+
+### The Magic: Hard Links & Inodes
+
+SafeShell uses **hard links** for backups, which means **zero extra disk space** for most backups.
+
+#### What's an Inode?
+
+Every file on disk has an **inode** (index node) - a unique ID that points to the actual data:
+
+```
+Filename        Inode       Data on disk
+────────────────────────────────────────
+report.txt  →   #12345  →   [Hello World...]
+photo.jpg   →   #12346  →   [FFD8FFE0...]
+```
+
+#### Normal Copy vs Hard Link
+
+**Normal copy** = new inode, duplicate data:
+```
+report.txt      →  inode #12345  →  [Hello World...]  ← 100KB
+report_copy.txt →  inode #67890  →  [Hello World...]  ← 100KB (duplicate!)
+
+Total: 200KB used
+```
+
+**Hard link** = same inode, same data:
+```
+report.txt  →  inode #12345  →  [Hello World...]  ← 100KB
+backup.txt  →  inode #12345  ↗   (points to same!)
+
+Total: 100KB used (zero extra!)
+```
+
+Both filenames point to the **same data on disk**. Not a copy - literally the same bytes.
+
+### Step-by-Step: What Happens When You Delete a File
+
+#### Step 1: You have a file
+```
+Filesystem:
+┌─────────────────────────────────────────┐
+│  report.txt  →  inode #12345  →  [data] │
+│                 link count: 1           │
+└─────────────────────────────────────────┘
+
+Disk usage: 100KB
+```
+
+#### Step 2: You run `rm report.txt`
+
+SafeShell intercepts and creates a hard link backup **before** deletion:
+```
+Filesystem:
+┌─────────────────────────────────────────────────────────┐
+│  report.txt                →  inode #12345  →  [data]  │
+│  ~/.safeshell/.../backup   →  inode #12345  ↗          │
+│                               link count: 2            │
+└─────────────────────────────────────────────────────────┘
+
+Disk usage: 100KB (still the same!)
+```
+
+#### Step 3: Real `rm` executes
+```
+Filesystem:
+┌─────────────────────────────────────────────────────────┐
+│  report.txt                   ❌ DELETED                │
+│  ~/.safeshell/.../backup   →  inode #12345  →  [data]  │
+│                               link count: 1            │
+└─────────────────────────────────────────────────────────┘
+
+Disk usage: 100KB (data survives because backup still points to it!)
+```
+
+#### Step 4: Rollback with `safeshell rollback --last`
+```
+SafeShell restores the file:
+
+┌─────────────────────────────────────────────────────────┐
+│  report.txt                →  inode #12345  →  [data]  │
+│  ~/.safeshell/.../backup   →  inode #12345  ↗          │
+│                               link count: 2            │
+└─────────────────────────────────────────────────────────┘
+
+✓ File restored to original location!
+```
+
+### The Complete Flow
+
+```
+You type:     rm report.txt
+                   │
+                   ▼
+              ┌─────────────────────────────────┐
+              │         SHELL ALIAS             │
+              │  rm → safeshell wrap rm         │
+              └─────────────────────────────────┘
+                   │
+                   ▼
+              ┌─────────────────────────────────┐
+              │        SAFESHELL WRAP           │
+              │                                 │
+              │  1. Parse command arguments     │
+              │  2. Identify target files       │
+              │  3. Create checkpoint:          │
+              │     - Generate unique ID        │
+              │     - Hard link files to backup │
+              │     - Save manifest.json        │
+              │  4. Execute real /bin/rm        │
+              └─────────────────────────────────┘
+                   │
+                   ▼
+              File deleted, but backup exists
+                   │
+            ┌──────┴──────┐
+            │             │
+         All good    Made a mistake?
+            │             │
+            ▼             ▼
+          Done    safeshell rollback --last
+                          │
+                          ▼
+                    ✓ Restored!
+```
+
+### Why Hard Links Are Brilliant
+
+| Aspect | Regular Copy | Hard Link |
+|--------|--------------|-----------|
+| Disk space | 2x (duplicate) | 0 extra |
+| Speed | Slow (copy bytes) | Instant |
+| Data safety | Independent | Shared until modified |
+
+**The catch:** Hard links only work on the same filesystem. If your file is on a different drive, SafeShell falls back to a regular copy.
+
+### When Does Extra Space Get Used?
+
+1. **Cross-filesystem backups** - Falls back to copying
+2. **After rollback** - The restored file may use new space if original inode is gone
+3. **Compressed checkpoints** - Uses space for the archive, but saves space long-term
 
 ---
 
