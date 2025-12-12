@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # SafeShell Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/safeshell/safeshell/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/qhkm/safeshell/main/install.sh | bash
 #
 
 set -e
@@ -140,59 +140,47 @@ install_binary() {
     # Create install directory
     mkdir -p "$INSTALL_DIR"
 
-    # For now, try to build from source if Go is available
-    # In production, this would download pre-built binaries
-    if command -v go &> /dev/null; then
-        info "Building from source..."
-        local tmp_dir=$(mktemp -d)
-        cd "$tmp_dir"
+    # Download pre-built binary from releases
+    local filename="safeshell_${platform}.tar.gz"
+    local download_url="$GITHUB_URL/releases/download/$version/$filename"
 
-        # Clone and build
-        git clone --depth 1 "$GITHUB_URL.git" safeshell 2>/dev/null || {
-            # If repo doesn't exist yet, check for local build
-            if [[ -f "$HOME/ios/safeshell/build/safeshell" ]]; then
-                cp "$HOME/ios/safeshell/build/safeshell" "$INSTALL_DIR/safeshell"
-                chmod +x "$INSTALL_DIR/safeshell"
-                cd - > /dev/null
-                rm -rf "$tmp_dir"
-                return 0
-            fi
-            error "Could not download SafeShell. Please check your internet connection."
-        }
+    info "Downloading SafeShell $version for $platform..."
 
-        cd safeshell
-        go build -o "$INSTALL_DIR/safeshell" ./cmd/safeshell
+    local tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+
+    if curl -fsSL "$download_url" -o safeshell.tar.gz 2>/dev/null; then
+        tar -xzf safeshell.tar.gz
+        # The archive contains just the binary named safeshell_platform
+        mv safeshell_* "$INSTALL_DIR/safeshell" 2>/dev/null || mv safeshell "$INSTALL_DIR/safeshell"
+        chmod +x "$INSTALL_DIR/safeshell"
         cd - > /dev/null
         rm -rf "$tmp_dir"
-    else
-        # Download pre-built binary
-        local filename="safeshell_${version#v}_${platform}.tar.gz"
-        local download_url="$GITHUB_URL/releases/download/$version/$filename"
+        return 0
+    fi
 
-        info "Downloading SafeShell $version for $platform..."
+    cd - > /dev/null
+    rm -rf "$tmp_dir"
 
+    # Fallback: build from source if Go is available
+    if command -v go &> /dev/null; then
+        info "Download failed, building from source..."
         local tmp_dir=$(mktemp -d)
         cd "$tmp_dir"
 
-        if ! curl -fsSL "$download_url" -o safeshell.tar.gz 2>/dev/null; then
-            # Fallback: try local build
-            if [[ -f "$HOME/ios/safeshell/build/safeshell" ]]; then
-                cp "$HOME/ios/safeshell/build/safeshell" "$INSTALL_DIR/safeshell"
-                chmod +x "$INSTALL_DIR/safeshell"
-                cd - > /dev/null
-                rm -rf "$tmp_dir"
-                return 0
-            fi
-            error "Could not download SafeShell. Release may not exist yet."
+        if git clone --depth 1 "$GITHUB_URL.git" safeshell 2>/dev/null; then
+            cd safeshell
+            go build -o "$INSTALL_DIR/safeshell" ./cmd/safeshell
+            cd - > /dev/null
+            rm -rf "$tmp_dir"
+            return 0
         fi
-
-        tar -xzf safeshell.tar.gz
-        mv safeshell*/safeshell "$INSTALL_DIR/safeshell" 2>/dev/null || mv safeshell "$INSTALL_DIR/safeshell"
-        chmod +x "$INSTALL_DIR/safeshell"
 
         cd - > /dev/null
         rm -rf "$tmp_dir"
     fi
+
+    error "Could not install SafeShell. Please check your internet connection or install Go."
 }
 
 main() {
