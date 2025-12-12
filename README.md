@@ -97,6 +97,57 @@ SafeShell is installed. If you make a destructive mistake, run:
 safeshell rollback --last
 ```
 
+## MCP Integration (Claude Code & Others)
+
+SafeShell includes an MCP (Model Context Protocol) server that lets AI agents interact with checkpoints directly - no shell commands needed.
+
+### Setup for Claude Code
+
+Add to your Claude Code MCP settings (`~/.claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "safeshell": {
+      "command": "safeshell",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### MCP Tools Available
+
+| Tool | Description |
+|------|-------------|
+| `checkpoint_create` | Create a checkpoint BEFORE risky operations |
+| `checkpoint_list` | List all available checkpoints |
+| `checkpoint_rollback` | Rollback to a checkpoint (use `id: "latest"` for most recent) |
+| `checkpoint_status` | Get SafeShell status and statistics |
+| `checkpoint_delete` | Delete a specific checkpoint |
+
+### Example Agent Workflow
+
+```
+Agent: "I need to delete the build folder. Let me create a checkpoint first."
+→ Uses checkpoint_create(paths: ["./build"], reason: "before cleanup")
+
+Agent: "Now deleting..."
+→ Runs rm -rf ./build
+
+Agent: "Oops, that was the wrong folder!"
+→ Uses checkpoint_rollback(id: "latest")
+
+Agent: "Files restored. Let me try again with the correct path."
+```
+
+### Why MCP?
+
+- **Proactive safety**: Agent creates checkpoint BEFORE destructive operations
+- **Direct integration**: No shell parsing needed
+- **Rich context**: Include reasons for checkpoints
+- **Better control**: Query what's protected, selective rollback
+
 ## Alternative Install
 
 ### Homebrew (macOS/Linux)
