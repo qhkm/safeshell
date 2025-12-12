@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/safeshell/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/checkpoint"
 	"github.com/spf13/cobra"
 )
 

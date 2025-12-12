@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/safeshell/safeshell/internal/checkpoint"
-	"github.com/safeshell/safeshell/internal/config"
+	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/config"
 	"github.com/spf13/cobra"
 )
 

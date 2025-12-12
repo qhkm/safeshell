@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/safeshell/safeshell/internal/checkpoint"
-	"github.com/safeshell/safeshell/internal/rollback"
+	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/rollback"
 	"github.com/spf13/cobra"
 )
 

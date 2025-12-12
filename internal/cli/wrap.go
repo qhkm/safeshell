@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/safeshell/safeshell/internal/wrapper"
+	"github.com/qhkm/safeshell/internal/wrapper"
 	"github.com/spf13/cobra"
 )
 

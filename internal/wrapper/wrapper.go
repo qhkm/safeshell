@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/safeshell/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/checkpoint"
 )
 
 // Wrap executes a command with automatic checkpoint creation

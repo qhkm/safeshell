@@ -18,7 +18,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/safeshell/safeshell/internal/cli.version={{.Version}}
+      - -s -w -X github.com/qhkm/safeshell/internal/cli.version={{.Version}}
 
 archives:
   - format: tar.gz
@@ -46,9 +46,9 @@ changelog:
 brews:
   - name: safeshell
     repository:
-      owner: safeshell
+      owner: qhkm
       name: homebrew-tap
-    homepage: https://github.com/safeshell/safeshell
+    homepage: https://github.com/qhkm/safeshell
     description: Safe shell operations with automatic checkpoints for AI agents
     license: MIT
     install: |

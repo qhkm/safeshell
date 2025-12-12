@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/safeshell/safeshell/internal/config"
+	"github.com/qhkm/safeshell/internal/config"
 )
 
 type Checkpoint struct {

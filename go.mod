@@ -1,4 +1,4 @@
-module github.com/safeshell/safeshell
+module github.com/qhkm/safeshell
 
 go 1.20
 

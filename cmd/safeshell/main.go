@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/safeshell/safeshell/internal/cli"
+	"github.com/qhkm/safeshell/internal/cli"
 )
 
 func main() {

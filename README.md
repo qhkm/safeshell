@@ -7,7 +7,7 @@ Safe shell operations with automatic checkpoints for AI agents.
 ## Install (One Command)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/safeshell/safeshell/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/qhkm/safeshell/main/install.sh | bash
 ```
 
 Then restart your terminal. **That's it.**
@@ -84,14 +84,14 @@ brew install safeshell/tap/safeshell
 
 ### Go
 ```bash
-go install github.com/safeshell/safeshell@latest
+go install github.com/qhkm/safeshell@latest
 safeshell init
 source ~/.zshrc
 ```
 
 ### Manual
 ```bash
-git clone https://github.com/safeshell/safeshell
+git clone https://github.com/qhkm/safeshell
 cd safeshell
 make install
 safeshell init
@@ -101,7 +101,7 @@ source ~/.zshrc
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/safeshell/safeshell/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/qhkm/safeshell/main/uninstall.sh | bash
 ```
 
 ## Config

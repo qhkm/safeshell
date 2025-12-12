@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/safeshell/safeshell/internal/config"
+	"github.com/qhkm/safeshell/internal/config"
 	"github.com/spf13/cobra"
 )
 

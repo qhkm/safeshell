@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration
-REPO="safeshell/safeshell"
+REPO="qhkm/safeshell"
 INSTALL_DIR="${SAFESHELL_INSTALL_DIR:-$HOME/.local/bin}"
 GITHUB_URL="https://github.com/$REPO"
 
