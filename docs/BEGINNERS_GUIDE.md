@@ -196,6 +196,15 @@ safeshell clean --older-than 3d    # Remove checkpoints older than 3 days
 safeshell clean --keep 10          # Keep only the last 10 checkpoints
 ```
 
+### Disable/Enable SafeShell
+
+```bash
+safeshell disable   # Remove aliases, use normal binaries
+safeshell enable    # Re-enable SafeShell protection
+```
+
+Your checkpoints remain intact when disabled.
+
 ---
 
 ## Understanding Checkpoints
@@ -452,9 +461,19 @@ echo "alias mycommand='safeshell wrap mycommand'" >> ~/.zshrc
 
 ### Q: How do I completely disable SafeShell temporarily?
 
-**A:** Use the full path to bypass aliases:
+**A:** Use the `disable` command:
 ```bash
-/bin/rm file.txt  # Bypasses SafeShell
+safeshell disable   # Removes aliases, reverts to normal binaries
+source ~/.zshrc     # Apply changes
+
+# Later, re-enable:
+safeshell enable    # Adds aliases back
+source ~/.zshrc
+```
+
+Or bypass aliases for a single command:
+```bash
+/bin/rm file.txt  # Bypasses SafeShell for this command only
 ```
 
 ### Q: Can I use SafeShell with Docker?
