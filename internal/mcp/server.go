@@ -116,18 +116,27 @@ func (s *Server) handleListTools(req *JSONRPCRequest) {
 						Type:        "string",
 						Description: "Maximum number of checkpoints to return (default: 10)",
 					},
+					"session": {
+						Type:        "boolean",
+						Description: "If true, only show checkpoints from current terminal session",
+					},
 				},
 			},
 		},
 		{
 			Name:        "checkpoint_rollback",
-			Description: "Rollback to a previous checkpoint, restoring all backed up files to their original locations.",
+			Description: "Rollback to a previous checkpoint, restoring backed up files to their original locations.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"id": {
 						Type:        "string",
 						Description: "Checkpoint ID to rollback to. Use 'latest' for most recent checkpoint.",
+					},
+					"files": {
+						Type:        "array",
+						Description: "Optional: restore only specific files (array of file paths). If omitted, restores all files.",
+						Items:       &Items{Type: "string"},
 					},
 				},
 				Required: []string{"id"},
@@ -150,6 +159,98 @@ func (s *Server) handleListTools(req *JSONRPCRequest) {
 					"id": {
 						Type:        "string",
 						Description: "Checkpoint ID to delete",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "checkpoint_diff",
+			Description: "Show what would be restored if you rollback to a checkpoint. Compares checkpoint contents with current filesystem state.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Checkpoint ID to compare. Use 'latest' for most recent checkpoint.",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "checkpoint_tag",
+			Description: "Add or remove tags from a checkpoint for better organization.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Checkpoint ID to tag. Use 'latest' for most recent checkpoint.",
+					},
+					"tag": {
+						Type:        "string",
+						Description: "Tag to add or remove",
+					},
+					"remove": {
+						Type:        "boolean",
+						Description: "If true, remove the tag instead of adding it",
+					},
+					"note": {
+						Type:        "string",
+						Description: "Set a note for the checkpoint (optional)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "checkpoint_search",
+			Description: "Search for checkpoints by file name, tag, or command.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"file": {
+						Type:        "string",
+						Description: "Search by file name or path (partial match)",
+					},
+					"tag": {
+						Type:        "string",
+						Description: "Search by tag",
+					},
+					"command": {
+						Type:        "string",
+						Description: "Search by command (partial match)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "checkpoint_compress",
+			Description: "Compress checkpoints to save disk space. Compressed checkpoints are automatically decompressed when you rollback.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Checkpoint ID to compress. Use 'latest' for most recent, or 'all' to compress all uncompressed checkpoints.",
+					},
+					"older_than": {
+						Type:        "string",
+						Description: "Compress checkpoints older than this duration (e.g., '7d', '24h'). Overrides 'id' parameter.",
+					},
+				},
+			},
+		},
+		{
+			Name:        "checkpoint_decompress",
+			Description: "Decompress a previously compressed checkpoint.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Checkpoint ID to decompress. Use 'latest' for most recent.",
 					},
 				},
 				Required: []string{"id"},

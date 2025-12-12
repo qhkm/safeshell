@@ -189,6 +189,11 @@ exclude_paths:         # Don't backup these
   - ".git/objects/*"
 ```
 
+## Documentation
+
+- **[Beginner's Guide](docs/BEGINNERS_GUIDE.md)** - Complete guide for new users
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to SafeShell
+
 ## License
 
 MIT

@@ -16,12 +16,18 @@ type FileEntry struct {
 }
 
 type Manifest struct {
-	ID         string      `json:"id"`
-	Timestamp  time.Time   `json:"timestamp"`
-	Command    string      `json:"command"`
-	WorkingDir string      `json:"working_dir"`
-	Files      []FileEntry `json:"files"`
-	RolledBack bool        `json:"rolled_back"`
+	ID             string      `json:"id"`
+	SessionID      string      `json:"session_id,omitempty"`
+	Timestamp      time.Time   `json:"timestamp"`
+	Command        string      `json:"command"`
+	WorkingDir     string      `json:"working_dir"`
+	Files          []FileEntry `json:"files"`
+	RolledBack     bool        `json:"rolled_back"`
+	Tags           []string    `json:"tags,omitempty"`
+	Note           string      `json:"note,omitempty"`
+	Compressed     bool        `json:"compressed,omitempty"`
+	CompressedSize int64       `json:"compressed_size,omitempty"`
+	CompressedAt   time.Time   `json:"compressed_at,omitempty"`
 }
 
 func NewManifest(id, command, workingDir string) *Manifest {

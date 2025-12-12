@@ -20,6 +20,9 @@ func setupTestEnv(t *testing.T) (string, func()) {
 	os.Setenv("HOME", tmpDir)
 	config.Init()
 
+	// Reset index to ensure fresh state for each test
+	checkpoint.ResetIndex()
+
 	// Create test files directory
 	testDir := filepath.Join(tmpDir, "testdata")
 	os.MkdirAll(testDir, 0755)

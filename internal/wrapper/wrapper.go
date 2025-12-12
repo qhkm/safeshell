@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
 )
 
@@ -45,6 +47,115 @@ func Wrap(cmdName string, args []string) error {
 
 	// Execute the actual command
 	return executeCommand(cmdName, args)
+}
+
+// WrapDryRun shows what would be backed up without creating checkpoint or executing command
+func WrapDryRun(cmdName string, args []string) error {
+	fullCommand := cmdName + " " + strings.Join(args, " ")
+
+	fmt.Println()
+	color.New(color.FgCyan, color.Bold).Println("Dry Run - No changes will be made")
+	fmt.Println()
+	fmt.Printf("Command: %s\n", fullCommand)
+	fmt.Println()
+
+	// Check if command is supported
+	cmdDef, ok := GetCommand(cmdName)
+	if !ok {
+		color.Yellow("⚠ Command '%s' is not wrapped by SafeShell\n", cmdName)
+		fmt.Println("  This command will execute without creating a checkpoint.")
+		fmt.Println()
+		fmt.Println("Wrapped commands: rm, mv, cp, chmod, chown")
+		return nil
+	}
+
+	fmt.Printf("Risk level: %s\n", cmdDef.RiskLevel)
+	fmt.Println()
+
+	// Parse arguments to get target paths
+	targets, err := cmdDef.Parser(args)
+	if err != nil {
+		return fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	if len(targets) == 0 {
+		color.Yellow("⚠ No target files/directories detected\n")
+		fmt.Println("  No checkpoint would be created.")
+		return nil
+	}
+
+	color.New(color.FgWhite, color.Bold).Println("Files/directories to backup:")
+	fmt.Println()
+
+	var totalSize int64
+	var totalFiles int
+	existingCount := 0
+
+	for _, target := range targets {
+		info, err := os.Stat(target)
+		if os.IsNotExist(err) {
+			color.New(color.FgHiBlack).Printf("  ✗ %s (does not exist - will be skipped)\n", target)
+			continue
+		}
+		if err != nil {
+			color.New(color.FgRed).Printf("  ✗ %s (error: %v)\n", target, err)
+			continue
+		}
+
+		existingCount++
+
+		if info.IsDir() {
+			// Count files in directory
+			dirFiles := 0
+			var dirSize int64
+			filepath.Walk(target, func(path string, fi os.FileInfo, err error) error {
+				if err != nil || fi.IsDir() {
+					return err
+				}
+				dirFiles++
+				dirSize += fi.Size()
+				return nil
+			})
+			totalFiles += dirFiles
+			totalSize += dirSize
+			color.Green("  ✓ %s/ (directory, %d files, %s)\n", target, dirFiles, formatBytes(dirSize))
+		} else {
+			totalFiles++
+			totalSize += info.Size()
+			color.Green("  ✓ %s (%s)\n", target, formatBytes(info.Size()))
+		}
+	}
+
+	fmt.Println()
+	color.New(color.FgWhite, color.Bold).Println("Summary:")
+	if existingCount > 0 {
+		fmt.Printf("  • %d path(s) would be backed up\n", existingCount)
+		fmt.Printf("  • %d total file(s)\n", totalFiles)
+		fmt.Printf("  • %s total size\n", formatBytes(totalSize))
+		fmt.Println()
+		color.Green("✓ A checkpoint would be created before executing this command\n")
+	} else {
+		color.Yellow("⚠ No existing files to backup - no checkpoint would be created\n")
+	}
+
+	fmt.Println()
+	fmt.Println("To execute this command for real, run without --dry-run:")
+	color.Cyan("  safeshell wrap %s\n", fullCommand)
+
+	return nil
+}
+
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func executeCommand(cmdName string, args []string) error {

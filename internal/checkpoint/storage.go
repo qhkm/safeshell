@@ -1,6 +1,8 @@
 package checkpoint
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +28,29 @@ func BackupFile(srcPath, dstPath string) error {
 	return copyFile(srcPath, dstPath)
 }
 
+// copyBufferSize is 32KB - optimal for most filesystems
+const copyBufferSize = 32 * 1024
+
+// Reusable buffer pool to reduce allocations during file copies
+var copyBufferPool = make(chan []byte, 4)
+
+func getCopyBuffer() []byte {
+	select {
+	case buf := <-copyBufferPool:
+		return buf
+	default:
+		return make([]byte, copyBufferSize)
+	}
+}
+
+func putCopyBuffer(buf []byte) {
+	select {
+	case copyBufferPool <- buf:
+	default:
+		// Pool full, let GC handle it
+	}
+}
+
 func copyFile(src, dst string) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -44,7 +69,11 @@ func copyFile(src, dst string) error {
 	}
 	defer dstFile.Close()
 
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
+	// Use buffered copy for better performance
+	buf := getCopyBuffer()
+	defer putCopyBuffer(buf)
+
+	if _, err := io.CopyBuffer(dstFile, srcFile, buf); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)
 	}
 
@@ -128,4 +157,171 @@ func GetDiskUsage(path string) (int64, error) {
 		return nil
 	})
 	return size, err
+}
+
+// CompressDir compresses a directory into a .tar.gz file and removes the original
+func CompressDir(srcDir, archivePath string) (int64, error) {
+	// Create the archive file
+	archiveFile, err := os.Create(archivePath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create archive: %w", err)
+	}
+	defer archiveFile.Close()
+
+	// Create gzip writer
+	gzWriter := gzip.NewWriter(archiveFile)
+	defer gzWriter.Close()
+
+	// Create tar writer
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
+
+	// Walk the source directory and add files to archive
+	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		// Create tar header
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+
+		// Write header
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// If it's a file, write its contents
+		if !info.IsDir() {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			if _, err := io.Copy(tarWriter, file); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to create archive: %w", err)
+	}
+
+	// Close writers to flush data
+	tarWriter.Close()
+	gzWriter.Close()
+	archiveFile.Close()
+
+	// Get compressed size
+	info, err := os.Stat(archivePath)
+	if err != nil {
+		return 0, err
+	}
+	compressedSize := info.Size()
+
+	// Remove original directory
+	if err := os.RemoveAll(srcDir); err != nil {
+		return compressedSize, fmt.Errorf("failed to remove original directory: %w", err)
+	}
+
+	return compressedSize, nil
+}
+
+// DecompressDir decompresses a .tar.gz file into a directory
+func DecompressDir(archivePath, dstDir string) error {
+	// Open archive file
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer archiveFile.Close()
+
+	// Create gzip reader
+	gzReader, err := gzip.NewReader(archiveFile)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzReader.Close()
+
+	// Create tar reader
+	tarReader := tar.NewReader(gzReader)
+
+	// Ensure destination directory exists
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Extract files
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read archive: %w", err)
+		}
+
+		targetPath := filepath.Join(dstDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+		case tar.TypeReg:
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory: %w", err)
+			}
+
+			// Create file
+			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return fmt.Errorf("failed to create file: %w", err)
+			}
+
+			if _, err := io.Copy(file, tarReader); err != nil {
+				file.Close()
+				return fmt.Errorf("failed to write file: %w", err)
+			}
+			file.Close()
+		}
+	}
+
+	return nil
+}
+
+// IsCompressed checks if a checkpoint directory has been compressed
+func IsCompressed(checkpointDir string) bool {
+	archivePath := filepath.Join(checkpointDir, "files.tar.gz")
+	_, err := os.Stat(archivePath)
+	return err == nil
+}
+
+// GetArchivePath returns the path to the compressed archive
+func GetArchivePath(checkpointDir string) string {
+	return filepath.Join(checkpointDir, "files.tar.gz")
+}
+
+// GetFilesDir returns the path to the files directory
+func GetFilesDir(checkpointDir string) string {
+	return filepath.Join(checkpointDir, "files")
 }
