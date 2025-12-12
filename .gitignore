@@ -25,3 +25,7 @@ Thumbs.db
 # Local config
 .env
 *.local
+
+# Test coverage
+coverage.out
+coverage.html

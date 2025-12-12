@@ -39,6 +39,16 @@ run: build
 test:
 	go test -v ./...
 
+# Run tests with coverage
+test-coverage:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Run tests (short output)
+test-short:
+	go test ./...
+
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
