@@ -194,6 +194,20 @@ exclude_paths:         # Don't backup these
 - **[Beginner's Guide](docs/BEGINNERS_GUIDE.md)** - Complete guide for new users
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to SafeShell
 
+## The Story Behind the Name
+
+The name **SafeShell** is inspired by [SafeTensors](https://github.com/huggingface/safetensors) from Hugging Face.
+
+SafeTensors solved a critical problem in ML: pickle files could execute arbitrary code when loaded, making model sharing dangerous. Their solution? A simple, safe format that just stores tensors - nothing executable, nothing dangerous.
+
+We saw a parallel problem emerging with AI agents. As agents like Claude Code and Cursor gain the ability to execute shell commands, they can accidentally cause real damage - deleted files, overwritten configs, broken systems. The traditional approach of "ask permission for everything" breaks the flow and defeats the purpose of autonomous agents.
+
+**SafeShell applies the same philosophy**: instead of restricting what agents can do, make everything safely reversible. Let them run freely, experiment boldly, and fix mistakes instantly.
+
+Just as SafeTensors made ML model sharing safe by design, SafeShell makes AI agent operations safe by design.
+
+*"The best safety is invisible safety."*
+
 ## License
 
 MIT
