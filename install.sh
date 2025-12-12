@@ -72,7 +72,7 @@ detect_os() {
 
 get_latest_version() {
     curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | \
-        grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "v0.1.0"
+        grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "v0.1.1"
 }
 
 detect_shell() {

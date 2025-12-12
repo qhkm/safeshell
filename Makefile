@@ -1,7 +1,7 @@
 .PHONY: build install clean test run deps
 
 BINARY_NAME=safeshell
-VERSION=0.1.0
+VERSION=0.1.1
 BUILD_DIR=./build
 INSTALL_DIR=$(HOME)/go/bin
 
