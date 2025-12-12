@@ -40,6 +40,8 @@ safeshell rollback --last # Undo the last destructive command
 safeshell rollback <id>   # Rollback to specific checkpoint
 safeshell status          # Show stats
 safeshell clean           # Remove old checkpoints
+safeshell disable         # Revert to normal binaries
+safeshell enable          # Re-enable SafeShell protection
 ```
 
 ## Why This Approach?

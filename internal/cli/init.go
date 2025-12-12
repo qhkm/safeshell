@@ -11,10 +11,13 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Setup shell aliases for safeshell",
+	Use:     "init",
+	Aliases: []string{"enable"},
+	Short:   "Setup shell aliases for safeshell",
 	Long: `Adds shell aliases to your shell configuration file (.zshrc or .bashrc).
-This makes rm, mv, cp, chmod, and chown automatically create checkpoints.`,
+This makes rm, mv, cp, chmod, and chown automatically create checkpoints.
+
+Use 'safeshell disable' to remove the aliases and revert to normal binaries.`,
 	RunE: runInit,
 }
 
