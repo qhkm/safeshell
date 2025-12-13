@@ -120,6 +120,9 @@ func showAllConfig() error {
 
 	fmt.Println()
 	color.HiBlack("Config file: %s/config.yaml", viper.Get("safeshell_dir"))
+	fmt.Println()
+	color.HiBlack("To modify: safeshell config set <key> <value>")
+	color.HiBlack("Example:   safeshell config set retention_days 3")
 
 	return nil
 }
