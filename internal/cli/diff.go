@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -116,7 +117,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	if unchanged > 0 {
 		color.Green("  • %d file(s) unchanged - no action needed\n", unchanged)
 	}
-	fmt.Printf("  • Total restore size: %s\n", formatBytes(totalRestoreSize))
+	fmt.Printf("  • Total restore size: %s\n", util.FormatBytes(totalRestoreSize))
 	fmt.Println()
 
 	// Filter by specific file if requested
@@ -155,13 +156,13 @@ func runDiff(cmd *cobra.Command, args []string) error {
 			switch d.Status {
 			case "deleted":
 				color.Red("  + %s", displayPath)
-				color.New(color.FgHiBlack).Printf(" (%s)\n", formatBytes(d.BackupSize))
+				color.New(color.FgHiBlack).Printf(" (%s)\n", util.FormatBytes(d.BackupSize))
 				if diffContent {
 					showFileContent(d.BackupPath, "backup")
 				}
 			case "modified":
 				color.Yellow("  ~ %s", displayPath)
-				color.New(color.FgHiBlack).Printf(" (%s → %s)\n", formatBytes(d.CurrentSize), formatBytes(d.BackupSize))
+				color.New(color.FgHiBlack).Printf(" (%s → %s)\n", util.FormatBytes(d.CurrentSize), util.FormatBytes(d.BackupSize))
 				if diffContent {
 					showContentDiff(d.BackupPath, d.Path)
 				}

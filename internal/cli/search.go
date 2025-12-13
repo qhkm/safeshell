@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -108,7 +109,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────────")
 
 	for _, cp := range results {
-		timeStr := formatRelativeTime(cp.CreatedAt)
+		timeStr := util.FormatTimeAgo(cp.CreatedAt)
 
 		// Count files
 		fileCount := 0

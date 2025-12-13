@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -102,7 +102,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	for i, cp := range checkpoints[:displayCount] {
 		// Format time relative to now
-		timeStr := formatRelativeTime(cp.CreatedAt)
+		timeStr := util.FormatTimeAgo(cp.CreatedAt)
 
 		// Count files (exclude directories)
 		fileCount := 0
@@ -195,7 +195,7 @@ func runListGrouped() error {
 		fmt.Printf("─────────────────────────────────────────────\n")
 
 		for _, cp := range checkpoints {
-			timeStr := formatRelativeTime(cp.CreatedAt)
+			timeStr := util.FormatTimeAgo(cp.CreatedAt)
 
 			fileCount := 0
 			for _, f := range cp.Manifest.Files {
@@ -221,33 +221,4 @@ func runListGrouped() error {
 	}
 
 	return nil
-}
-
-func formatRelativeTime(t time.Time) string {
-	diff := time.Since(t)
-
-	switch {
-	case diff < time.Minute:
-		return "just now"
-	case diff < time.Hour:
-		mins := int(diff.Minutes())
-		if mins == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", mins)
-	case diff < 24*time.Hour:
-		hours := int(diff.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	case diff < 7*24*time.Hour:
-		days := int(diff.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	default:
-		return t.Format("Jan 2, 15:04")
-	}
 }

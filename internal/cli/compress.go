@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +63,7 @@ func runCompress(cmd *cobra.Command, args []string) error {
 		if count == 0 {
 			fmt.Println("No checkpoints to compress.")
 		} else {
-			color.Green("✓ Compressed %d checkpoint(s), saved %s\n", count, formatBytes(saved))
+			color.Green("✓ Compressed %d checkpoint(s), saved %s\n", count, util.FormatBytes(saved))
 		}
 		return nil
 	}
@@ -99,7 +100,7 @@ func runCompress(cmd *cobra.Command, args []string) error {
 
 func compressCheckpoint(cp *checkpoint.Checkpoint) error {
 	if cp.Manifest.Compressed {
-		color.Yellow("Checkpoint %s is already compressed (%s)\n", cp.ID, formatBytes(cp.Manifest.CompressedSize))
+		color.Yellow("Checkpoint %s is already compressed (%s)\n", cp.ID, util.FormatBytes(cp.Manifest.CompressedSize))
 		return nil
 	}
 
@@ -114,9 +115,9 @@ func compressCheckpoint(cp *checkpoint.Checkpoint) error {
 	ratio := float64(compressedSize) / float64(originalSize) * 100
 
 	color.Green("✓ Compressed checkpoint %s\n", cp.ID)
-	fmt.Printf("  Original:   %s\n", formatBytes(originalSize))
-	fmt.Printf("  Compressed: %s (%.1f%%)\n", formatBytes(compressedSize), ratio)
-	fmt.Printf("  Saved:      %s\n", formatBytes(saved))
+	fmt.Printf("  Original:   %s\n", util.FormatBytes(originalSize))
+	fmt.Printf("  Compressed: %s (%.1f%%)\n", util.FormatBytes(compressedSize), ratio)
+	fmt.Printf("  Saved:      %s\n", util.FormatBytes(saved))
 
 	return nil
 }
@@ -163,14 +164,14 @@ func compressAllCheckpoints() error {
 		compressed++
 
 		ratio := float64(compressedSize) / float64(originalSize) * 100
-		fmt.Printf("  %s → %s (%.1f%%)\n", formatBytes(originalSize), formatBytes(compressedSize), ratio)
+		fmt.Printf("  %s → %s (%.1f%%)\n", util.FormatBytes(originalSize), util.FormatBytes(compressedSize), ratio)
 	}
 
 	fmt.Println()
 	if compressed == 0 {
 		fmt.Println("No checkpoints to compress.")
 	} else {
-		color.Green("✓ Compressed %d checkpoint(s), total saved: %s\n", compressed, formatBytes(totalSaved))
+		color.Green("✓ Compressed %d checkpoint(s), total saved: %s\n", compressed, util.FormatBytes(totalSaved))
 	}
 
 	return nil

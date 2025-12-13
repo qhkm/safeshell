@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
+	"github.com/qhkm/safeshell/internal/util"
 )
 
 // Wrap executes a command with automatic checkpoint creation
@@ -118,11 +119,11 @@ func WrapDryRun(cmdName string, args []string) error {
 			})
 			totalFiles += dirFiles
 			totalSize += dirSize
-			color.Green("  ✓ %s/ (directory, %d files, %s)\n", target, dirFiles, formatBytes(dirSize))
+			color.Green("  ✓ %s/ (directory, %d files, %s)\n", target, dirFiles, util.FormatBytes(dirSize))
 		} else {
 			totalFiles++
 			totalSize += info.Size()
-			color.Green("  ✓ %s (%s)\n", target, formatBytes(info.Size()))
+			color.Green("  ✓ %s (%s)\n", target, util.FormatBytes(info.Size()))
 		}
 	}
 
@@ -131,7 +132,7 @@ func WrapDryRun(cmdName string, args []string) error {
 	if existingCount > 0 {
 		fmt.Printf("  • %d path(s) would be backed up\n", existingCount)
 		fmt.Printf("  • %d total file(s)\n", totalFiles)
-		fmt.Printf("  • %s total size\n", formatBytes(totalSize))
+		fmt.Printf("  • %s total size\n", util.FormatBytes(totalSize))
 		fmt.Println()
 		color.Green("✓ A checkpoint would be created before executing this command\n")
 	} else {
@@ -143,19 +144,6 @@ func WrapDryRun(cmdName string, args []string) error {
 	color.Cyan("  safeshell wrap %s\n", fullCommand)
 
 	return nil
-}
-
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func executeCommand(cmdName string, args []string) error {

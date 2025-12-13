@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
 	"github.com/qhkm/safeshell/internal/config"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +59,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("Total files backed up: %d\n", totalFiles)
-		fmt.Printf("Storage used: %s\n", formatBytes(totalSize))
+		fmt.Printf("Storage used: %s\n", util.FormatBytes(totalSize))
 		fmt.Printf("Rolled back: %d\n", rolledBack)
 		fmt.Println()
 
@@ -67,24 +68,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		color.New(color.FgWhite, color.Bold).Println("Latest checkpoint:")
 		fmt.Printf("  ID:      %s\n", latest.ID)
 		fmt.Printf("  Command: %s\n", latest.Manifest.Command)
-		fmt.Printf("  Time:    %s\n", formatRelativeTime(latest.CreatedAt))
+		fmt.Printf("  Time:    %s\n", util.FormatTimeAgo(latest.CreatedAt))
 	} else {
 		fmt.Println()
 		fmt.Println("No checkpoints yet. Run 'safeshell init' to set up automatic checkpoints.")
 	}
 
 	return nil
-}
-
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

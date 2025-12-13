@@ -10,6 +10,7 @@ import (
 	"github.com/qhkm/safeshell/internal/checkpoint"
 	"github.com/qhkm/safeshell/internal/config"
 	"github.com/qhkm/safeshell/internal/rollback"
+	"github.com/qhkm/safeshell/internal/util"
 )
 
 func (s *Server) registerTools() {
@@ -138,7 +139,7 @@ func (s *Server) toolCheckpointList(args map[string]interface{}) (string, error)
 			}
 		}
 
-		timeAgo := formatTimeAgo(cp.CreatedAt)
+		timeAgo := util.FormatTimeAgo(cp.CreatedAt)
 		reason := cp.Manifest.Command
 		if len(reason) > 30 {
 			reason = reason[:27] + "..."
@@ -276,7 +277,7 @@ func (s *Server) toolCheckpointStatus(args map[string]interface{}) (string, erro
 	sb.WriteString(fmt.Sprintf("Max checkpoints: %d\n\n", cfg.MaxCheckpoints))
 	sb.WriteString(fmt.Sprintf("Total checkpoints: %d\n", len(checkpoints)))
 	sb.WriteString(fmt.Sprintf("Total files backed up: %d\n", totalFiles))
-	sb.WriteString(fmt.Sprintf("Storage used: %s\n", formatBytes(totalSize)))
+	sb.WriteString(fmt.Sprintf("Storage used: %s\n", util.FormatBytes(totalSize)))
 	sb.WriteString(fmt.Sprintf("Rolled back: %d\n", rolledBack))
 
 	if len(checkpoints) > 0 {
@@ -284,7 +285,7 @@ func (s *Server) toolCheckpointStatus(args map[string]interface{}) (string, erro
 		sb.WriteString(fmt.Sprintf("\nLatest checkpoint:\n"))
 		sb.WriteString(fmt.Sprintf("  ID: %s\n", latest.ID))
 		sb.WriteString(fmt.Sprintf("  Reason: %s\n", latest.Manifest.Command))
-		sb.WriteString(fmt.Sprintf("  Time: %s\n", formatTimeAgo(latest.CreatedAt)))
+		sb.WriteString(fmt.Sprintf("  Time: %s\n", util.FormatTimeAgo(latest.CreatedAt)))
 	}
 
 	return sb.String(), nil
@@ -513,7 +514,7 @@ func (s *Server) toolCheckpointSearch(args map[string]interface{}) (string, erro
 			}
 		}
 
-		timeAgo := formatTimeAgo(cp.CreatedAt)
+		timeAgo := util.FormatTimeAgo(cp.CreatedAt)
 		command := cp.Manifest.Command
 		if len(command) > 30 {
 			command = command[:27] + "..."
@@ -536,49 +537,6 @@ func (s *Server) toolCheckpointSearch(args map[string]interface{}) (string, erro
 	return sb.String(), nil
 }
 
-// Helper functions
-func formatTimeAgo(t time.Time) string {
-	diff := time.Since(t)
-
-	switch {
-	case diff < time.Minute:
-		return "just now"
-	case diff < time.Hour:
-		mins := int(diff.Minutes())
-		if mins == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", mins)
-	case diff < 24*time.Hour:
-		hours := int(diff.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	case diff < 7*24*time.Hour:
-		days := int(diff.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	default:
-		return t.Format("Jan 2, 15:04")
-	}
-}
-
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
 func (s *Server) toolCheckpointCompress(args map[string]interface{}) (string, error) {
 	// Handle older_than parameter (takes precedence)
 	if olderThan, ok := args["older_than"].(string); ok && olderThan != "" {
@@ -596,7 +554,7 @@ func (s *Server) toolCheckpointCompress(args map[string]interface{}) (string, er
 			return "No checkpoints to compress.", nil
 		}
 
-		return fmt.Sprintf("Compressed %d checkpoint(s), saved %s", count, formatBytes(saved)), nil
+		return fmt.Sprintf("Compressed %d checkpoint(s), saved %s", count, util.FormatBytes(saved)), nil
 	}
 
 	// Handle id parameter
@@ -633,7 +591,7 @@ func (s *Server) toolCheckpointCompress(args map[string]interface{}) (string, er
 			return "No checkpoints to compress (all already compressed).", nil
 		}
 
-		return fmt.Sprintf("Compressed %d checkpoint(s), total saved: %s", compressed, formatBytes(totalSaved)), nil
+		return fmt.Sprintf("Compressed %d checkpoint(s), total saved: %s", compressed, util.FormatBytes(totalSaved)), nil
 	}
 
 	// Single checkpoint
@@ -653,7 +611,7 @@ func (s *Server) toolCheckpointCompress(args map[string]interface{}) (string, er
 	}
 
 	if cp.Manifest.Compressed {
-		return fmt.Sprintf("Checkpoint %s is already compressed (%s)", cp.ID, formatBytes(cp.Manifest.CompressedSize)), nil
+		return fmt.Sprintf("Checkpoint %s is already compressed (%s)", cp.ID, util.FormatBytes(cp.Manifest.CompressedSize)), nil
 	}
 
 	originalSize, compressedSize, err := checkpoint.Compress(cp.ID)
@@ -673,10 +631,10 @@ Saved: %s
 
 The checkpoint will be automatically decompressed when you rollback.`,
 		cp.ID,
-		formatBytes(originalSize),
-		formatBytes(compressedSize),
+		util.FormatBytes(originalSize),
+		util.FormatBytes(compressedSize),
 		ratio,
-		formatBytes(saved),
+		util.FormatBytes(saved),
 	), nil
 }
 

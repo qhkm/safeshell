@@ -7,6 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/qhkm/safeshell/internal/checkpoint"
 	"github.com/qhkm/safeshell/internal/config"
+	"github.com/qhkm/safeshell/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -84,7 +85,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 
 		for _, cp := range checkpoints {
 			if cp.CreatedAt.Before(cutoff) {
-				fmt.Printf("Would delete: %s (%s)\n", cp.ID, formatRelativeTime(cp.CreatedAt))
+				fmt.Printf("Would delete: %s (%s)\n", cp.ID, util.FormatTimeAgo(cp.CreatedAt))
 				toDelete++
 			}
 		}
@@ -124,7 +125,7 @@ func cleanWithCompress(duration time.Duration, dryRun bool) error {
 	for _, cp := range checkpoints {
 		if cp.CreatedAt.Before(cutoff) && !cp.Manifest.Compressed {
 			if dryRun {
-				fmt.Printf("Would compress: %s (%s)\n", cp.ID, formatRelativeTime(cp.CreatedAt))
+				fmt.Printf("Would compress: %s (%s)\n", cp.ID, util.FormatTimeAgo(cp.CreatedAt))
 				toCompress++
 			} else {
 				fmt.Printf("Compressing: %s...\n", cp.ID)
@@ -137,7 +138,7 @@ func cleanWithCompress(duration time.Duration, dryRun bool) error {
 				totalCompressed += compressedSize
 				toCompress++
 				ratio := float64(compressedSize) / float64(originalSize) * 100
-				fmt.Printf("  %s → %s (%.1f%%)\n", formatBytes(originalSize), formatBytes(compressedSize), ratio)
+				fmt.Printf("  %s → %s (%.1f%%)\n", util.FormatBytes(originalSize), util.FormatBytes(compressedSize), ratio)
 			}
 		}
 	}
@@ -148,7 +149,7 @@ func cleanWithCompress(duration time.Duration, dryRun bool) error {
 		fmt.Printf("\nWould compress %d checkpoint(s). Run without --dry-run to compress.\n", toCompress)
 	} else {
 		saved := totalOriginal - totalCompressed
-		color.Green("✓ Compressed %d checkpoint(s), saved %s\n", toCompress, formatBytes(saved))
+		color.Green("✓ Compressed %d checkpoint(s), saved %s\n", toCompress, util.FormatBytes(saved))
 	}
 
 	return nil
@@ -180,7 +181,7 @@ func cleanKeepN(keepCount int, dryRun bool, compress bool) error {
 		}
 
 		if dryRun {
-			fmt.Printf("Would %s: %s (%s)\n", action, cp.ID, formatRelativeTime(cp.CreatedAt))
+			fmt.Printf("Would %s: %s (%s)\n", action, cp.ID, util.FormatTimeAgo(cp.CreatedAt))
 			processed++
 		} else {
 			if compress {

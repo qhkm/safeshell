@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -166,19 +167,12 @@ func (idx *Index) rebuildLocked() error {
 	}
 
 	// Sort by timestamp (oldest first), then by ID for same-timestamp entries
-	for i := 0; i < len(tempEntries)-1; i++ {
-		for j := i + 1; j < len(tempEntries); j++ {
-			swap := false
-			if tempEntries[j].Timestamp.Before(tempEntries[i].Timestamp) {
-				swap = true
-			} else if tempEntries[j].Timestamp.Equal(tempEntries[i].Timestamp) && tempEntries[j].ID < tempEntries[i].ID {
-				swap = true
-			}
-			if swap {
-				tempEntries[i], tempEntries[j] = tempEntries[j], tempEntries[i]
-			}
+	sort.Slice(tempEntries, func(i, j int) bool {
+		if tempEntries[i].Timestamp.Equal(tempEntries[j].Timestamp) {
+			return tempEntries[i].ID < tempEntries[j].ID
 		}
-	}
+		return tempEntries[i].Timestamp.Before(tempEntries[j].Timestamp)
+	})
 
 	// Assign sequences in sorted order
 	for _, e := range tempEntries {
@@ -283,20 +277,12 @@ func (idx *Index) ListEntries() []*IndexEntry {
 	}
 
 	// Sort by timestamp descending, then by sequence descending as tiebreaker
-	for i := 0; i < len(entries)-1; i++ {
-		for j := i + 1; j < len(entries); j++ {
-			swap := false
-			if entries[j].Timestamp.After(entries[i].Timestamp) {
-				swap = true
-			} else if entries[j].Timestamp.Equal(entries[i].Timestamp) && entries[j].Sequence > entries[i].Sequence {
-				// Same timestamp, use sequence as tiebreaker
-				swap = true
-			}
-			if swap {
-				entries[i], entries[j] = entries[j], entries[i]
-			}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Timestamp.Equal(entries[j].Timestamp) {
+			return entries[i].Sequence > entries[j].Sequence
 		}
-	}
+		return entries[i].Timestamp.After(entries[j].Timestamp)
+	})
 
 	return entries
 }
