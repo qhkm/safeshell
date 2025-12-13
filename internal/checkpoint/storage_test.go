@@ -200,3 +200,319 @@ func TestGetDiskUsage(t *testing.T) {
 		t.Errorf("Expected 15 bytes, got %d", size)
 	}
 }
+
+// === Exclusion Tests ===
+
+func TestShouldExclude(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		// Should exclude
+		{"node_modules dir", "/project/node_modules", true},
+		{"nested node_modules", "/project/packages/app/node_modules", true},
+		{".git dir", "/project/.git", true},
+		{".safeshell dir", "/Users/test/.safeshell", true},
+		{"build dir", "/project/build", true},
+		{".build dir", "/project/.build", true},
+		{"vendor dir", "/project/vendor", true},
+		{"DerivedData", "/Users/test/Library/Developer/Xcode/DerivedData", true},
+		{".DS_Store file", "/project/.DS_Store", true},
+		{"__pycache__", "/project/src/__pycache__", true},
+		{"dist dir", "/project/dist", true},
+		{"target dir", "/project/target", true},
+		{".venv dir", "/project/.venv", true},
+		{".cache dir", "/project/.cache", true},
+
+		// Should NOT exclude
+		{"src dir", "/project/src", false},
+		{"regular file", "/project/main.go", false},
+		{"file named node_modules.txt", "/project/node_modules.txt", false},
+		{"dir containing node_modules in name", "/project/my_node_modules_backup", false},
+		{"build in middle of path", "/project/build_scripts/run.sh", false},
+		{"vendor in filename", "/project/vendor.json", false},
+		{".git in filename", "/project/.gitignore", false},
+		{"nested src", "/project/packages/core/src", false},
+		{"buildfile", "/project/buildfile", false},
+		{"distribute", "/project/distribute", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldExclude(tt.path)
+			if result != tt.expected {
+				t.Errorf("shouldExclude(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestShouldExcludeCaseSensitivity(t *testing.T) {
+	// Exclusions should be case-sensitive (Unix convention)
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/project/node_modules", true},
+		{"/project/Node_Modules", false}, // Different case = not excluded
+		{"/project/NODE_MODULES", false},
+		{"/project/.git", true},
+		{"/project/.Git", false},
+		{"/project/.GIT", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := shouldExclude(tt.path)
+			if result != tt.expected {
+				t.Errorf("shouldExclude(%q) = %v, want %v (case sensitivity)", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBackupDirWithExclusions(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	// Create source structure with excluded directories
+	dirs := []string{
+		"src/app",
+		"src/node_modules/package",
+		"src/.git/objects",
+		"src/vendor",
+		"src/real_code",
+		"src/.safeshell/checkpoints",
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755); err != nil {
+			t.Fatalf("Failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Create files
+	files := map[string]string{
+		"src/main.go":                        "package main",
+		"src/app/app.go":                     "package app",
+		"src/node_modules/package/index.js":  "module.exports = {}",
+		"src/.git/config":                    "[core]",
+		"src/vendor/lib.go":                  "package vendor",
+		"src/real_code/util.go":              "package real",
+		"src/.gitignore":                     "*.log",
+		"src/.safeshell/checkpoints/test.json": "{}",
+	}
+
+	for path, content := range files {
+		fullPath := filepath.Join(tmpDir, path)
+		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create file %s: %v", path, err)
+		}
+	}
+
+	// Run backup
+	if err := BackupDir(srcDir, dstDir); err != nil {
+		t.Fatalf("BackupDir failed: %v", err)
+	}
+
+	// Check what was backed up
+	shouldExist := []string{
+		"main.go",
+		"app/app.go",
+		"real_code/util.go",
+		".gitignore",
+	}
+
+	shouldNotExist := []string{
+		"node_modules",
+		"node_modules/package/index.js",
+		".git",
+		".git/config",
+		"vendor",
+		"vendor/lib.go",
+		".safeshell",
+		".safeshell/checkpoints/test.json",
+	}
+
+	for _, path := range shouldExist {
+		fullPath := filepath.Join(dstDir, path)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			t.Errorf("Expected %s to exist in backup, but it doesn't", path)
+		}
+	}
+
+	for _, path := range shouldNotExist {
+		fullPath := filepath.Join(dstDir, path)
+		if _, err := os.Stat(fullPath); err == nil {
+			t.Errorf("Expected %s to NOT exist in backup, but it does", path)
+		}
+	}
+}
+
+func TestSymlinkHandling(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a regular file
+	regularFile := filepath.Join(tmpDir, "regular.txt")
+	if err := os.WriteFile(regularFile, []byte("content"), 0644); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	// Create a symlink
+	symlinkPath := filepath.Join(tmpDir, "link.txt")
+	if err := os.Symlink(regularFile, symlinkPath); err != nil {
+		t.Skipf("Symlinks not supported: %v", err)
+	}
+
+	// Test isSymlink
+	if !isSymlink(symlinkPath) {
+		t.Error("isSymlink should return true for symlink")
+	}
+
+	if isSymlink(regularFile) {
+		t.Error("isSymlink should return false for regular file")
+	}
+
+	if isSymlink(filepath.Join(tmpDir, "nonexistent")) {
+		t.Error("isSymlink should return false for nonexistent path")
+	}
+}
+
+func TestBackupDirSkipsSymlinks(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	// Create source structure
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("Failed to create src dir: %v", err)
+	}
+
+	// Create regular file
+	regularFile := filepath.Join(srcDir, "regular.txt")
+	if err := os.WriteFile(regularFile, []byte("content"), 0644); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	// Create symlink
+	symlinkPath := filepath.Join(srcDir, "link.txt")
+	if err := os.Symlink(regularFile, symlinkPath); err != nil {
+		t.Skipf("Symlinks not supported: %v", err)
+	}
+
+	// Run backup
+	if err := BackupDir(srcDir, dstDir); err != nil {
+		t.Fatalf("BackupDir failed: %v", err)
+	}
+
+	// Regular file should exist
+	if _, err := os.Stat(filepath.Join(dstDir, "regular.txt")); os.IsNotExist(err) {
+		t.Error("regular.txt should exist in backup")
+	}
+
+	// Symlink should NOT exist (skipped)
+	if _, err := os.Stat(filepath.Join(dstDir, "link.txt")); err == nil {
+		t.Error("link.txt (symlink) should not exist in backup")
+	}
+}
+
+func TestFrameworkExclusion(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	// Create framework structure
+	frameworkDir := filepath.Join(srcDir, "Sparkle.framework")
+	if err := os.MkdirAll(filepath.Join(frameworkDir, "Headers"), 0755); err != nil {
+		t.Fatalf("Failed to create framework dir: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(frameworkDir, "Sparkle"), []byte("binary"), 0644); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	// Create regular file
+	if err := os.WriteFile(filepath.Join(srcDir, "main.swift"), []byte("import Sparkle"), 0644); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	// Run backup
+	if err := BackupDir(srcDir, dstDir); err != nil {
+		t.Fatalf("BackupDir failed: %v", err)
+	}
+
+	// Framework should not exist
+	if _, err := os.Stat(filepath.Join(dstDir, "Sparkle.framework")); err == nil {
+		t.Error("Sparkle.framework should not exist in backup")
+	}
+
+	// Regular file should exist
+	if _, err := os.Stat(filepath.Join(dstDir, "main.swift")); os.IsNotExist(err) {
+		t.Error("main.swift should exist in backup")
+	}
+}
+
+func TestDeepNestedExclusion(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	// Create deeply nested node_modules (monorepo style)
+	paths := []string{
+		"packages/app1/node_modules/dep/index.js",
+		"packages/app2/node_modules/dep/index.js",
+		"packages/app1/src/main.ts",
+		"packages/app2/src/main.ts",
+	}
+
+	for _, p := range paths {
+		fullPath := filepath.Join(srcDir, p)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			t.Fatalf("Failed to create dir: %v", err)
+		}
+		if err := os.WriteFile(fullPath, []byte("content"), 0644); err != nil {
+			t.Fatalf("Failed to create file: %v", err)
+		}
+	}
+
+	// Run backup
+	if err := BackupDir(srcDir, dstDir); err != nil {
+		t.Fatalf("BackupDir failed: %v", err)
+	}
+
+	// Source files should exist
+	if _, err := os.Stat(filepath.Join(dstDir, "packages/app1/src/main.ts")); os.IsNotExist(err) {
+		t.Error("packages/app1/src/main.ts should exist")
+	}
+	if _, err := os.Stat(filepath.Join(dstDir, "packages/app2/src/main.ts")); os.IsNotExist(err) {
+		t.Error("packages/app2/src/main.ts should exist")
+	}
+
+	// node_modules should not exist
+	if _, err := os.Stat(filepath.Join(dstDir, "packages/app1/node_modules")); err == nil {
+		t.Error("packages/app1/node_modules should not exist")
+	}
+	if _, err := os.Stat(filepath.Join(dstDir, "packages/app2/node_modules")); err == nil {
+		t.Error("packages/app2/node_modules should not exist")
+	}
+}
+
+func TestEmptyDirectoryBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("Failed to create src dir: %v", err)
+	}
+
+	if err := BackupDir(srcDir, dstDir); err != nil {
+		t.Fatalf("BackupDir failed on empty dir: %v", err)
+	}
+
+	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
+		t.Error("Destination directory should exist")
+	}
+}
