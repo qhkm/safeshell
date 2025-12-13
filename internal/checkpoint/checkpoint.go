@@ -41,6 +41,11 @@ type Checkpoint struct {
 
 // Create creates a new checkpoint for the given files before executing a command
 func Create(command string, targetPaths []string) (*Checkpoint, error) {
+	// Check storage limit before creating checkpoint
+	if exceeds, currentMB, limitMB := CheckTotalStorage(); exceeds {
+		fmt.Fprintf(os.Stderr, "Warning: Storage limit exceeded (%dMB / %dMB). Run 'safeshell clean' to free space.\n", currentMB, limitMB)
+	}
+
 	// Generate unique ID
 	timestamp := time.Now().Format("2006-01-02T150405")
 	shortUUID := uuid.New().String()[:8]
@@ -63,12 +68,22 @@ func Create(command string, targetPaths []string) (*Checkpoint, error) {
 	manifest := NewManifest(id, command, workingDir)
 	manifest.SessionID = GetSessionID()
 
+	// Track sensitive files for warning
+	var sensitiveFiles []SensitiveFileInfo
+	var skippedLargeFiles []string
+
 	// Backup each target path
 	for _, targetPath := range targetPaths {
 		// Resolve to absolute path
 		absPath := targetPath
 		if !filepath.IsAbs(targetPath) {
 			absPath = filepath.Join(workingDir, targetPath)
+		}
+
+		// Validate path is safe to backup
+		if err := ValidatePath(absPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+			continue
 		}
 
 		// Check if path exists
@@ -111,12 +126,34 @@ func Create(command string, targetPaths []string) (*Checkpoint, error) {
 					return nil
 				}
 
+				// Check for sensitive files
+				if isSensitive, pattern := IsSensitiveFile(path); isSensitive {
+					sensitiveFiles = append(sensitiveFiles, SensitiveFileInfo{Path: path, Pattern: pattern})
+				}
+
+				// Check file size limit
+				if exceeds, sizeMB, limitMB := CheckFileSize(path); exceeds {
+					skippedLargeFiles = append(skippedLargeFiles, fmt.Sprintf("%s (%dMB > %dMB limit)", path, sizeMB, limitMB))
+					return nil // Skip large files
+				}
+
 				relFilePath := strings.TrimPrefix(path, "/")
 				backupFilePath := filepath.Join(filesDir, relFilePath)
 				manifest.AddFile(path, backupFilePath, fi.Mode(), fi.Size(), false)
 				return nil
 			})
 		} else {
+			// Check for sensitive files
+			if isSensitive, pattern := IsSensitiveFile(absPath); isSensitive {
+				sensitiveFiles = append(sensitiveFiles, SensitiveFileInfo{Path: absPath, Pattern: pattern})
+			}
+
+			// Check file size limit
+			if exceeds, sizeMB, limitMB := CheckFileSize(absPath); exceeds {
+				skippedLargeFiles = append(skippedLargeFiles, fmt.Sprintf("%s (%dMB > %dMB limit)", absPath, sizeMB, limitMB))
+				continue // Skip large files
+			}
+
 			// Backup single file
 			if err := BackupFile(absPath, backupPath); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to backup file %s: %v\n", absPath, err)
@@ -124,6 +161,24 @@ func Create(command string, targetPaths []string) (*Checkpoint, error) {
 			}
 			manifest.AddFile(absPath, backupPath, info.Mode(), info.Size(), false)
 		}
+	}
+
+	// Warn about sensitive files
+	if len(sensitiveFiles) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Warning: Backing up %d sensitive file(s):\n", len(sensitiveFiles))
+		for _, sf := range sensitiveFiles {
+			fmt.Fprintf(os.Stderr, "   • %s (matched: %s)\n", sf.Path, sf.Pattern)
+		}
+		fmt.Fprintf(os.Stderr, "   Consider adding these to your exclusions if they contain secrets.\n\n")
+	}
+
+	// Warn about skipped large files
+	if len(skippedLargeFiles) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Warning: Skipped %d large file(s):\n", len(skippedLargeFiles))
+		for _, f := range skippedLargeFiles {
+			fmt.Fprintf(os.Stderr, "   • %s\n", f)
+		}
+		fmt.Fprintf(os.Stderr, "   Increase max_file_size_mb in config to include these files.\n\n")
 	}
 
 	// Save manifest

@@ -39,14 +39,25 @@ func (s *Server) toolCheckpointCreate(args map[string]interface{}) (string, erro
 	}
 
 	var paths []string
+	var invalidPaths []string
 	for _, p := range pathsArray {
 		if str, ok := p.(string); ok {
+			// Validate each path
+			if err := checkpoint.ValidatePath(str); err != nil {
+				invalidPaths = append(invalidPaths, fmt.Sprintf("%s: %v", str, err))
+				continue
+			}
 			paths = append(paths, str)
 		}
 	}
 
+	// Report invalid paths
+	if len(invalidPaths) > 0 {
+		return "", fmt.Errorf("invalid paths rejected:\n%s", strings.Join(invalidPaths, "\n"))
+	}
+
 	if len(paths) == 0 {
-		return "", fmt.Errorf("paths array is empty")
+		return "", fmt.Errorf("paths array is empty or all paths were invalid")
 	}
 
 	// Get reason

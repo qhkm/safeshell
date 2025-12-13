@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/qhkm/safeshell/internal/config"
 )
 
 // DefaultExclusions contains directory names that are excluded by default.
@@ -93,6 +95,130 @@ func shouldSkipPath(path string, info os.FileInfo) (skip bool, skipDir bool) {
 	}
 
 	return false, false
+}
+
+// SensitiveFileInfo contains information about a detected sensitive file
+type SensitiveFileInfo struct {
+	Path    string
+	Pattern string
+}
+
+// IsSensitiveFile checks if a file matches sensitive patterns
+func IsSensitiveFile(path string) (bool, string) {
+	cfg := config.Get()
+	if cfg == nil || !cfg.WarnSensitiveFiles {
+		return false, ""
+	}
+
+	base := filepath.Base(path)
+	baseLower := strings.ToLower(base)
+
+	for _, pattern := range cfg.SensitivePatterns {
+		patternLower := strings.ToLower(pattern)
+
+		// Direct match
+		if baseLower == patternLower {
+			return true, pattern
+		}
+
+		// Glob-style matching
+		if matched, _ := filepath.Match(patternLower, baseLower); matched {
+			return true, pattern
+		}
+
+		// Check if pattern is in path (for patterns like ".aws/credentials")
+		if strings.Contains(patternLower, "/") {
+			if strings.Contains(strings.ToLower(path), patternLower) {
+				return true, pattern
+			}
+		}
+	}
+
+	return false, ""
+}
+
+// CheckFileSize checks if a file exceeds the maximum allowed size
+// Returns (exceedsLimit, fileSizeMB, limitMB)
+func CheckFileSize(path string) (bool, int64, int) {
+	cfg := config.Get()
+	if cfg == nil || cfg.MaxFileSizeMB <= 0 {
+		return false, 0, 0
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, 0, cfg.MaxFileSizeMB
+	}
+
+	fileSizeMB := info.Size() / (1024 * 1024)
+	return fileSizeMB > int64(cfg.MaxFileSizeMB), fileSizeMB, cfg.MaxFileSizeMB
+}
+
+// CheckTotalStorage checks if current storage exceeds the limit
+// Returns (exceedsLimit, currentMB, limitMB)
+func CheckTotalStorage() (bool, int64, int) {
+	cfg := config.Get()
+	if cfg == nil || cfg.MaxStorageMB <= 0 {
+		return false, 0, 0
+	}
+
+	currentSize, err := GetDiskUsage(config.GetCheckpointsDir())
+	if err != nil {
+		return false, 0, cfg.MaxStorageMB
+	}
+
+	currentMB := currentSize / (1024 * 1024)
+	return currentMB > int64(cfg.MaxStorageMB), currentMB, cfg.MaxStorageMB
+}
+
+// ValidatePath checks if a path is safe to backup
+// Returns error if path is outside user's home or is a system directory
+func ValidatePath(path string) error {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+
+	// Clean the path to prevent traversal
+	absPath = filepath.Clean(absPath)
+
+	// Allow temp directories (needed for tests and legitimate use)
+	tempDirs := []string{
+		"/tmp",
+		"/var/folders",   // macOS temp
+		"/private/tmp",   // macOS
+		os.TempDir(),     // System temp dir
+	}
+
+	for _, tempDir := range tempDirs {
+		if strings.HasPrefix(absPath, tempDir) {
+			return nil // Allow temp directories
+		}
+	}
+
+	// Block absolute paths to system directories
+	systemDirs := []string{
+		"/etc",
+		"/usr",
+		"/bin",
+		"/sbin",
+		"/lib",
+		"/var",
+		"/root",
+		"/System",        // macOS
+		"/Library",       // macOS (system)
+		"/Applications",  // macOS
+		"/private/etc",   // macOS
+		"/private/var",   // macOS (but /private/tmp is allowed above)
+	}
+
+	for _, sysDir := range systemDirs {
+		if strings.HasPrefix(absPath, sysDir+"/") || absPath == sysDir {
+			return fmt.Errorf("cannot backup system directory: %s", absPath)
+		}
+	}
+
+	return nil
 }
 
 // BackupFile creates a backup of a file using hard links when possible.
