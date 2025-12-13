@@ -47,6 +47,9 @@ var DefaultExclusions = []string{
 	".yarn",        // Yarn cache
 	".cargo",       // Rust cargo
 	"DerivedData",  // Xcode
+
+	// SafeShell's own directory (prevent recursive backup)
+	".safeshell",
 }
 
 // shouldExclude checks if a path should be excluded from backup
