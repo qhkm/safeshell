@@ -213,4 +213,4 @@ Just as SafeTensors made ML model sharing safe by design, SafeShell makes AI age
 
 ## License
 
-MIT
+Apache 2.0
