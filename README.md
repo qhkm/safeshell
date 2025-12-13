@@ -35,14 +35,32 @@ safeshell rollback --last
 ## Commands
 
 ```bash
-safeshell list            # See all checkpoints
-safeshell rollback --last # Undo the last destructive command
-safeshell rollback <id>   # Rollback to specific checkpoint
-safeshell status          # Show stats
-safeshell clean           # Remove old checkpoints
-safeshell disable         # Revert to normal binaries
-safeshell enable          # Re-enable SafeShell protection
-safeshell upgrade         # Upgrade to latest version
+# Core
+safeshell list              # See all checkpoints
+safeshell rollback --last   # Undo the last destructive command
+safeshell rollback <id>     # Rollback to specific checkpoint
+safeshell status            # Show stats
+
+# Cleanup
+safeshell clean             # Remove old checkpoints (based on retention_days)
+safeshell clean --keep 10   # Keep only 10 most recent
+safeshell clean --older-than 3d  # Remove checkpoints older than 3 days
+
+# Configuration
+safeshell config            # View all settings
+safeshell config get <key>  # Get a setting
+safeshell config set <key> <value>  # Change a setting
+
+# Automatic cleanup
+safeshell schedule          # View schedule status
+safeshell schedule enable   # Enable daily auto-cleanup (midnight)
+safeshell schedule enable --hourly --keep 20  # Hourly, keep 20
+safeshell schedule disable  # Disable auto-cleanup
+
+# Setup
+safeshell disable           # Revert to normal binaries
+safeshell enable            # Re-enable SafeShell protection
+safeshell upgrade           # Upgrade to latest version
 ```
 
 ## Why This Approach?
@@ -182,14 +200,46 @@ curl -fsSL https://raw.githubusercontent.com/qhkm/safeshell/main/uninstall.sh | 
 
 ## Config
 
-Edit `~/.safeshell/config.yaml`:
+View and modify settings with `safeshell config`:
+
+```bash
+safeshell config                        # View all
+safeshell config set retention_days 3   # Change cleanup threshold
+safeshell config set max_storage_mb 2000  # Limit to 2GB
+```
+
+Or edit `~/.safeshell/config.yaml` directly:
 
 ```yaml
-retention_days: 7      # Auto-delete old checkpoints
-max_checkpoints: 100   # Keep last N checkpoints
-exclude_paths:         # Don't backup these
+# Storage limits
+max_storage_mb: 5000       # Total storage limit (default: 5GB)
+max_file_size_mb: 100      # Skip files larger than this (default: 100MB)
+max_checkpoints: 100       # Maximum checkpoints to keep
+
+# Cleanup
+retention_days: 7          # 'safeshell clean' removes older than this
+
+# Security
+warn_sensitive_files: true # Warn when backing up .env, *.pem, etc.
+sensitive_patterns:        # Patterns that trigger warnings
+  - ".env"
+  - "*.pem"
+  - "*.key"
+  - "id_rsa"
+
+# Exclusions (never backed up)
+exclude_paths:
   - "node_modules/*"
   - ".git/objects/*"
+  - "*.tmp"
+
+# Commands that trigger automatic checkpoints
+wrapped_commands:
+  - rm
+  - mv
+  - cp
+  - chmod
+  - chown
 ```
 
 ## Documentation
