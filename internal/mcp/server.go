@@ -12,7 +12,7 @@ import (
 const (
 	ProtocolVersion = "2024-11-05"
 	ServerName      = "safeshell"
-	ServerVersion   = "0.1.4"
+	ServerVersion   = "0.1.5"
 )
 
 type Server struct {
