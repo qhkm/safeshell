@@ -94,11 +94,23 @@ func Create(command string, targetPaths []string) (*Checkpoint, error) {
 			}
 			manifest.AddFile(absPath, backupPath, info.Mode(), 0, true)
 
-			// Also add individual files within the directory
+			// Also add individual files within the directory (respecting exclusions)
 			filepath.Walk(absPath, func(path string, fi os.FileInfo, err error) error {
-				if err != nil || fi.IsDir() {
-					return err
+				if err != nil {
+					return nil // Skip errors
 				}
+
+				// Skip excluded paths and symlinks
+				if shouldExclude(path) {
+					if fi.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if isSymlink(path) || fi.IsDir() {
+					return nil
+				}
+
 				relFilePath := strings.TrimPrefix(path, "/")
 				backupFilePath := filepath.Join(filesDir, relFilePath)
 				manifest.AddFile(path, backupFilePath, fi.Mode(), fi.Size(), false)

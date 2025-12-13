@@ -7,7 +7,90 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// DefaultExclusions contains directory names that are excluded by default.
+// These are typically generated/cached directories that can be regenerated.
+var DefaultExclusions = []string{
+	// Build outputs
+	".build",      // Swift Package Manager
+	"build",       // Generic build folder
+	"dist",        // Distribution builds
+	"out",         // Common output folder
+	"target",      // Rust/Maven builds
+
+	// Dependencies
+	"node_modules", // Node.js
+	"vendor",       // Go vendor, PHP composer
+	".venv",        // Python virtual env
+	"venv",         // Python virtual env
+	"__pycache__",  // Python cache
+	".pytest_cache",// Python pytest
+
+	// IDE/Editor
+	".idea",        // JetBrains
+	".vscode",      // VS Code (usually safe to exclude)
+
+	// Version control
+	".git",         // Git internals
+	".svn",         // Subversion
+	".hg",          // Mercurial
+
+	// OS files
+	".DS_Store",    // macOS
+	"Thumbs.db",    // Windows
+
+	// Caches
+	".cache",       // Generic cache
+	".npm",         // npm cache
+	".yarn",        // Yarn cache
+	".cargo",       // Rust cargo
+	"DerivedData",  // Xcode
+}
+
+// shouldExclude checks if a path should be excluded from backup
+func shouldExclude(path string) bool {
+	base := filepath.Base(path)
+	for _, excluded := range DefaultExclusions {
+		if base == excluded {
+			return true
+		}
+	}
+	return false
+}
+
+// isSymlink checks if a path is a symbolic link
+func isSymlink(path string) bool {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeSymlink != 0
+}
+
+// shouldSkipPath checks if a path should be skipped (symlink or excluded)
+func shouldSkipPath(path string, info os.FileInfo) (skip bool, skipDir bool) {
+	// Check if it's a symlink
+	if isSymlink(path) {
+		return true, false
+	}
+
+	// Check exclusion list
+	if shouldExclude(path) {
+		if info.IsDir() {
+			return true, true // Skip entire directory
+		}
+		return true, false
+	}
+
+	// Skip framework bundles on macOS (contain symlinks)
+	if strings.HasSuffix(path, ".framework") && info.IsDir() {
+		return true, true
+	}
+
+	return false, false
+}
 
 // BackupFile creates a backup of a file using hard links when possible.
 // Falls back to copy if hard link fails (e.g., cross-filesystem).
@@ -80,11 +163,24 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-// BackupDir recursively backs up a directory
+// BackupDir recursively backs up a directory, skipping excluded paths and symlinks
 func BackupDir(srcPath, dstPath string) error {
 	return filepath.Walk(srcPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			// Skip permission errors gracefully
+			if os.IsPermission(err) {
+				return nil
+			}
 			return err
+		}
+
+		// Check if path should be skipped
+		skip, skipDir := shouldSkipPath(path, info)
+		if skip {
+			if skipDir {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		// Calculate relative path
