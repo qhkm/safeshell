@@ -22,7 +22,7 @@ Let agents run freely. Everything is reversible.`,
 		},
 	}
 
-	version = "0.1.8"
+	version = "0.1.9"
 )
 
 func init() {
