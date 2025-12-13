@@ -11,10 +11,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
+
+// httpClient with timeout to prevent hanging on slow/unresponsive servers
+var httpClient = &http.Client{
+	Timeout: 60 * time.Second,
+}
 
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
@@ -103,7 +109,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	resp, err := http.Get(downloadURL)
+	resp, err := httpClient.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
@@ -160,7 +166,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 }
 
 func getLatestVersion() (string, error) {
-	resp, err := http.Get("https://api.github.com/repos/qhkm/safeshell/releases/latest")
+	resp, err := httpClient.Get("https://api.github.com/repos/qhkm/safeshell/releases/latest")
 	if err != nil {
 		return "", err
 	}
@@ -196,10 +202,14 @@ func extractBinaryFromTarGz(r io.Reader) (string, error) {
 			return "", err
 		}
 
-		// Look for the safeshell binary
-		if header.Typeflag == tar.TypeReg &&
-			(header.Name == "safeshell" || strings.HasSuffix(header.Name, "/safeshell")) {
+		// Security: reject any path traversal attempts
+		if strings.Contains(header.Name, "..") {
+			return "", fmt.Errorf("illegal file path in archive: %s", header.Name)
+		}
 
+		// Look for the safeshell binary - must be exactly "safeshell" or in a single subdirectory
+		baseName := filepath.Base(header.Name)
+		if header.Typeflag == tar.TypeReg && baseName == "safeshell" {
 			tmpFile, err := os.CreateTemp("", "safeshell-bin-*")
 			if err != nil {
 				return "", err

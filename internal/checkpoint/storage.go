@@ -504,7 +504,11 @@ func DecompressDir(archivePath, dstDir string) error {
 			return fmt.Errorf("failed to read archive: %w", err)
 		}
 
+		// Prevent zip slip attack: validate path is within destination
 		targetPath := filepath.Join(dstDir, header.Name)
+		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(dstDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("illegal file path in archive: %s", header.Name)
+		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
